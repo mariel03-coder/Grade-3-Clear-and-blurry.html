@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Arcade Poké-Battle</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --arcade-pink: #ff00ff;
+            --arcade-cyan: #00ffff;
+            --arcade-yellow: #ffff00;
+            --hp-green: #39ff14;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Press Start 2P', cursive;
+            background: #000; color: white;
+            overflow: hidden; height: 100vh;
+            display: flex; user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* Selection Screen */
+        #selection-overlay {
+            position: fixed; inset: 0; 
+            background: #000;
+            background-image: linear-gradient(rgba(0, 255, 255, .1) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(0, 255, 255, .1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            z-index: 4000; display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+
+        .char-grid { display: flex; gap: 15px; margin-top: 30px; }
+        .char-card {
+            width: 110px; height: 110px; border: 4px solid #fff;
+            background: #222; cursor: pointer; transition: 0.1s;
+        }
+        .char-card:active { border-color: var(--arcade-cyan); transform: scale(1.1); }
+        .char-card img { width: 100%; height: 100%; object-fit: contain; }
+
+        /* Game Layout */
+        .player-zone {
+            flex: 1; height: 100%; position: relative;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            border: 4px solid #333;
+        }
+
+        #left-zone { background: linear-gradient(180deg, #1a001a 0%, #000 100%); border-right: 2px solid var(--arcade-pink); }
+        #right-zone { background: linear-gradient(180deg, #001a1a 0%, #000 100%); border-left: 2px solid var(--arcade-cyan); }
+
+        .hp-container {
+            width: 80%; height: 15px; background: #000;
+            border: 3px solid #fff; margin-bottom: 20px;
+        }
+        .hp-bar { width: 100%; height: 100%; background: var(--hp-green); transition: width 0.1s; box-shadow: 0 0 10px var(--hp-green); }
+
+        .image-frame {
+            width: 300px; height: 300px; border: 6px solid #fff;
+            background: #111; position: relative; overflow: hidden;
+            box-shadow: 0 0 20px var(--arcade-cyan);
+        }
+        
+        .target-img { 
+            width: 80%; height: 80%; margin: 10%; object-fit: contain; 
+            filter: blur(50px) brightness(0); transition: filter 0.2s; 
+            image-rendering: pixelated; /* Arcade feel */
+        }
+
+        .trainer-avatar { width: 80px; height: 80px; position: absolute; bottom: 30px; border: 2px solid #fff; }
+
+        /* Power Up Modal */
+        #power-up-modal {
+            display: none; position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); background: #000;
+            padding: 30px; border: 6px solid var(--arcade-yellow);
+            z-index: 5000; text-align: center; box-shadow: 0 0 50px var(--arcade-yellow);
+        }
+        .power-choices { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+        .power-item {
+            cursor: pointer; padding: 10px; border: 3px solid #fff;
+            font-size: 1.5rem; background: #111;
+        }
+        .power-item small { display: block; font-size: 0.6rem; margin-top: 10px; color: var(--arcade-cyan); }
+
+        .score { font-size: 3rem; color: var(--arcade-yellow); margin-bottom: 20px; text-shadow: 3px 3px var(--arcade-pink); }
+        h1 { font-size: 1.5rem; color: var(--arcade-cyan); text-align: center; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+    <div id="selection-overlay">
+        <h1>INSERT COIN<br>SELECT YOUR STARTER</h1>
+        <div class="char-grid">
+            <div class="char-card" onclick="selectHero('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png')"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png"></div>
+            <div class="char-card" onclick="selectHero('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png')"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png"></div>
+            <div class="char-card" onclick="selectHero('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png')"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png"></div>
+        </div>
+    </div>
+
+    <div id="power-up-modal">
+        <h2 style="font-size: 1rem;">POKEMON REVEALED!</h2>
+        <div class="power-choices">
+            <div class="power-item" onclick="applyPower('heart')">❤️<small>HEAL</small></div>
+            <div class="power-item" onclick="applyPower('diamond')">💎<small>BONUS</small></div>
+            <div class="power-item" onclick="applyPower('mystery')">🎁<small>RANDOM</small></div>
+        </div>
+    </div>
+
+    <div id="left-zone" class="player-zone" onmousedown="attack('left')">
+        <div class="score" id="score-left">0</div>
+        <div class="hp-container"><div id="hp-left" class="hp-bar"></div></div>
+        <div class="image-frame"><img src="" id="img-left" class="target-img"></div>
+        <img id="avatar-left" class="trainer-avatar" src="">
+    </div>
+
+    <div id="right-zone" class="player-zone" onmousedown="attack('right')">
+        <div class="score" id="score-right">0</div>
+        <div class="hp-container"><div id="hp-right" class="hp-bar"></div></div>
+        <div class="image-frame"><img src="" id="img-right" class="target-img"></div>
+        <img id="avatar-right" class="trainer-avatar" src="">
+    </div>
+
+    <audio id="bgm-arcade" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="sfx-coin"><source src="https://actions.google.com/sounds/v1/foley/coin_flip.ogg"></audio>
+    <audio id="sfx-blip"><source src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+    <audio id="sfx-win"><source src="https://actions.google.com/sounds/v1/cartoon/climb_down.ogg"></audio>
+
+    <script>
+        let choosing = 'p1';
+        let scores = { left: 0, right: 0 };
+        let hp = { left: 100, right: 100 };
+        let currentWinner = null;
+
+        // VOCABULARY IMAGES (Insert your photos here)
+        const gameImages = [
+            "https://www.icegif.com/wp-content/uploads/icegif-5378.gif",
+            "https://media1.tenor.com/images/4da3bb12ff8b214818481019ace3fb97/tenor.gif?itemid=10055847",
+            "https://i.pinimg.com/originals/92/3a/21/923a2151ce624bd50199a6d77d418802.gif",
+            "https://i.pinimg.com/736x/4c/15/49/4c1549a61212eda14444f14742f4d90a.jpg",
+            "https://www.icegif.com/wp-content/uploads/car-icegif-7.gif",
+            "https://tse2.mm.bing.net/th/id/OIP.YSlA4m08LkK_7ew0KlchtwAAAA?rs=1&pid=ImgDetMain&o=7&rm=3",
+            "https://www.unicothings.com/wp-content/uploads/2021/03/Bath-Soap-Slogans-1024x597.jpg" 
+        ];
+
+        function playSound(id) {
+            const sound = document.getElementById(id);
+            sound.currentTime = 0;
+            sound.play();
+        }
+
+        function selectHero(url) {
+            playSound('sfx-coin');
+            if (choosing === 'p1') {
+                document.getElementById('avatar-left').src = url;
+                choosing = 'p2';
+                document.getElementById('selection-overlay').querySelector('h1').innerHTML = "PLAYER 2<br>SELECT STARTER";
+            } else {
+                document.getElementById('avatar-right').src = url;
+                document.getElementById('selection-overlay').style.display = 'none';
+                document.getElementById('bgm-arcade').play();
+                newRound();
+            }
+        }
+
+        function attack(side) {
+            if (hp[side] <= 0 || document.getElementById('power-up-modal').style.display === 'block') return;
+            
+            playSound('sfx-blip');
+            hp[side] -= 5;
+            updateUI();
+
+            if (hp[side] <= 0) {
+                currentWinner = side;
+                playSound('sfx-win');
+                document.getElementById('power-up-modal').style.display = 'block';
+            }
+        }
+
+        function updateUI() {
+            ['left', 'right'].forEach(side => {
+                document.getElementById(`hp-${side}`).style.width = hp[side] + "%";
+                let blurVal = (hp[side] / 100) * 50;
+                let brightVal = 1 - (hp[side] / 100);
+                document.getElementById(`img-${side}`).style.filter = `blur(${blurVal}px) brightness(${brightVal})`;
+            });
+        }
+
+        function applyPower(type) {
+            playSound('sfx-coin');
+            const side = currentWinner;
+            if (type === 'heart') hp[side] = 100;
+            else if (type === 'diamond') scores[side] += 1;
+            else if (type === 'mystery') {
+                scores[side] += 3;
+                alert("BONUS: +3 SCORE!");
+            }
+
+            document.getElementById(`score-left`).innerText = scores.left;
+            document.getElementById(`score-right`).innerText = scores.right;
+            document.getElementById('power-up-modal').style.display = 'none';
+            newRound();
+        }
+
+        function newRound() {
+            hp = { left: 100, right: 100 };
+            const nextImg = gameImages[Math.floor(Math.random() * gameImages.length)];
+            document.getElementById('img-left').src = nextImg;
+            document.getElementById('img-right').src = nextImg;
+            updateUI();
+        }
+    </script>
+</body>
+</html>
